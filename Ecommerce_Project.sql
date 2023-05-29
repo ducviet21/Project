@@ -14,7 +14,7 @@ format_date('%Y%m', PARSE_DATE('%Y%m%d' , date)) as month
   group by 1
   order by visits desc;
   --cau 3
-  SELECT  -- results hoi khac so voi expected output
+  SELECT  
 'Month' as time_type,
 format_date('%Y%m', PARSE_DATE('%Y%m%d' , date)) as time,
  trafficSource.source,
@@ -27,7 +27,7 @@ group by 1,2,3
 union all
 SELECT  
 'week' as time_type,
-format_date('%Y%U', PARSE_DATE('%Y%m%d' , date)) as time,
+format_date('%Y%u', PARSE_DATE('%Y%m%d' , date)) as time,
  trafficSource.source,
 sum(productRevenue)/1000000 as revenue
  FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201706*`,
@@ -72,8 +72,8 @@ UNNEST (hits.product) product
  from cte
  group by 1;
  --cau 6
- with cte as(select format_date('%Y%m', PARSE_DATE('%Y%m%d' , date)) as month , --khac expected output
-((sum(totals.totalTransactionRevenue)/1000000)/sum(totals.visits) )  as i1
+ with cte as(select format_date('%Y%m', PARSE_DATE('%Y%m%d' , date)) as month , 
+((sum(totals.productRevenue)/1000000)/sum(totals.visits) )  as i1
  FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`,
 UNNEST (hits) hits,
 UNNEST (hits.product) product
@@ -83,18 +83,26 @@ UNNEST (hits.product) product
  from cte
  group by 1;
  --cau 7
- with cte as ( --khong giong voi output expected
-  select  
- distinct fullVisitorId ,V2productname as other_purchased_products,
-sum(productquantity) as quantity
- FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`,
-UNNEST (hits) hits,
-UNNEST (hits.product) product 
- where  product.productRevenue is not null and (V2productname = "YouTube Men's Vintage Henley") is not null
- group by 1,2)
- select other_purchased_products , quantity
- from cte 
- order by quantity desc ;
+ with buyer_list as(
+    SELECT
+        distinct fullVisitorId
+    FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`
+    , UNNEST(hits) AS hits
+    , UNNEST(hits.product) as product
+    WHERE product.v2ProductName = "YouTube Men's Vintage Henley"
+    AND totals.transactions>=1
+    AND product.productRevenue is not null)
+SELECT
+  product.v2ProductName AS other_purchased_products,
+  SUM(product.productQuantity) AS quantity
+FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`
+, UNNEST(hits) AS hits
+, UNNEST(hits.product) as product
+JOIN buyer_list using(fullVisitorId)
+WHERE product.v2ProductName != "YouTube Men's Vintage Henley"
+ and product.productRevenue is not null
+GROUP BY other_purchased_products
+ORDER BY quantity DESC;
  --cau 8
  with cte1 as (select format_date('%Y%m', PARSE_DATE('%Y%m%d' , date)) as month,
 count(eCommerceAction.action_type) as num_view
@@ -124,5 +132,4 @@ from cte1
 left join cte2 on cte1.month = cte2.month
 left join cte3 on cte2.month = cte3.month
 group by 1,2,3,4
-order by 1
-
+order by 1;
